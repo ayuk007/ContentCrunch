@@ -6,6 +6,7 @@ from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
 from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
 from langchain_core.output_parsers import StrOutputParser
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import nltk
 # nltk.download("averaged_perceptron_tagger")
 
@@ -18,8 +19,20 @@ class Summarizer:
         self.llm_model = ChatGroq(model = self.model_name, temperature = self.temperature)
         self.prompt = Prompt_And_Header.prompt
         self.header = Prompt_And_Header.header
-        self.chain = self.prompt | self.llm_model | StrOutputParser()
-        # self.chain = load_summarize_chain(llm = self.llm_model, chain_type = "stuff", prompt = self.prompt)
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size = 2000, chunk_overlap = 0)
+        # self.chain = self.prompt | self.llm_model | StrOutputParser()
+        question_prompt_template = """
+                  Please provide a summary of the following text.
+                  TEXT: {text}
+                  SUMMARY:
+                  """
+
+        question_prompt = PromptTemplate(
+            template=question_prompt_template, input_variable=["text"]
+        )
+        self.chain = load_summarize_chain(llm = self.llm_model, chain_type = "refine", 
+                                          refine_prompt = self.prompt, verbose = True,
+                                          question_prompt = question_prompt, return_intermediate_steps = True)
     def summarize(self, url, model: str = None, temperature: float = None):
 
         if model != self.model_name:
@@ -36,28 +49,40 @@ class Summarizer:
 
         return summary    
     def summarize_youtube_content(self, url):
+        print("Loading documents----")
         loader = YoutubeLoader.from_youtube_url(youtube_url=url, add_video_info = True)
         data = loader.load()
-        print("Data: ", data)
-        summary = self.chain.invoke({"content": data[0].page_content})
-        return summary
+        docs = self.text_splitter.split_documents(data)
+        print("Splitting documents-----")
+
+        summary = self.chain({"input_documents": docs})
+        
+        combined_summary = self.get_combined_summary(summary["intermediate_steps"])
+        return combined_summary
     
     def summarize_web_content(self, url):
         loader = UnstructuredURLLoader(urls = [url], ssl_verify = False, headers = self.header)
         data = loader.load()
-        summary = self.chain.invoke({"content": data})
-        return summary
-    
+        docs = self.text_splitter.split_documents(data)
+        # print("Docs: ", docs)
 
+        summary = self.chain.run(docs)
+        combined_summary = self.get_combined_summary(summary["intermediate_steps"])
+        return combined_summary
+    
+    def get_combined_summary(self, summary_docs):
+        combined_summary = "\n\n".join([doc.split("Summary:")[-1] for doc in summary_docs])
+        return combined_summary
 @dataclass
 class Prompt_And_Header:
     template = """
     You are an expert content creator.
     Your task is to read and understand content inside <content> tag and then create a brief summary.
-    Content: <content>{content}</content>
+    Content: <content>{text}</content>
     """
     prompt = PromptTemplate.from_template(
         template = template,
+        input_variable = ['text'],
     )
 
     header = {
