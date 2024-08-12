@@ -1,3 +1,4 @@
+import nltk
 import validators
 from dotenv import load_dotenv
 from dataclasses import dataclass
@@ -7,7 +8,6 @@ from langchain.chains.summarize import load_summarize_chain
 from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import nltk
 # nltk.download("averaged_perceptron_tagger")
 
 load_dotenv()
@@ -88,3 +88,19 @@ class Prompt_And_Header:
     header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36'
     }
+
+@dataclass
+class Get_Max_Tokens:
+    """
+    This data class denotes to the total number of tokens that'll be used by models,
+    i.e., input and output tokens
+    """
+
+    "llama-3.1-70b-versatile" = 8000 # 8192 allowed, has limit of 131K
+    "llama-3.1-8b-instant" = 8000 # 8192 allowed, has limit of 131K
+    "llama3-70b-8192" = 8000  # 8192
+    "llama3-8b-8192" = 8000  # 8192
+    "llama-guard-3-8b" = 8000 # 8192
+    "mixtral-8x7b-32768" = 32000 # 32768
+    "gemma-7b-it" = 8000 # 8192
+    "gemma2-9b-it" = 8000 # 8192
